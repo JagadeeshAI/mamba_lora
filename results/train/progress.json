@@ -1,0 +1,9 @@
+{
+    "best_val_acc": 55.3469387755102,
+    "best_model_path": "./results/train/best_model.pth",
+    "current_epoch": 22,
+    "current_epoch_progress": 50,
+    "current_snapshot_path": "./results/train/snapshot_epoch22_p50.pth",
+    "total_epochs": 300,
+    "completed": false
+}
