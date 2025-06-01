@@ -1,0 +1,13 @@
+Looking in indexes: https://download.pytorch.org/whl/cu118
+Collecting torch
+  Using cached https://download.pytorch.org/whl/cu118/torch-2.4.1%2Bcu118-cp38-cp38-linux_x86_64.whl (857.6 MB)
+Collecting torchvision
+  Using cached https://download.pytorch.org/whl/cu118/torchvision-0.19.1%2Bcu118-cp38-cp38-linux_x86_64.whl (6.3 MB)
+Collecting torchaudio
+  Using cached https://download.pytorch.org/whl/cu118/torchaudio-2.4.1%2Bcu118-cp38-cp38-linux_x86_64.whl (3.3 MB)
+Collecting filelock (from torch)
+  Using cached https://download.pytorch.org/whl/filelock-3.13.1-py3-none-any.whl.metadata (2.8 kB)
+Collecting typing-extensions>=4.8.0 (from torch)
+  Using cached https://download.pytorch.org/whl/typing_extensions-4.12.2-py3-none-any.whl.metadata (3.0 kB)
+Collecting sympy (from torch)
+  Using cached https://download.pytorch.org/whl/sympy-1.13.3-py3-none-any.whl.metadata (12 kB)
