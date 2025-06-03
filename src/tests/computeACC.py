@@ -14,26 +14,38 @@ from src.codes.data import get_full_val_loader
 
 def get_model():
     model = VisionMamba(
-        patch_size=16,
-        stride=8,
-        embed_dim=384,
-        depth=24,
-        rms_norm=True,
-        residual_in_fp32=True,
-        fused_add_norm=True,
-        final_pool_type="mean",
-        if_abs_pos_embed=True,
-        if_rope=False,
-        if_rope_residual=False,
-        bimamba_type="v2",
-        if_cls_token=True,
-        if_devide_out=True,
-        use_middle_cls_token=True,
-        num_classes=100,
-        drop_rate=0.0,
-        drop_path_rate=0.1,
-        drop_block_rate=None,
-        img_size=Config.IMAGE_SIZE,
+    patch_size=16,
+    stride=8,
+    embed_dim=384,
+    depth=24,
+    rms_norm=True,
+    residual_in_fp32=True,
+    fused_add_norm=True,
+    final_pool_type="mean",
+    if_abs_pos_embed=True,
+    if_rope=False,
+    if_rope_residual=False,
+    bimamba_type="v2",
+    if_cls_token=True,
+    if_devide_out=True,
+    use_middle_cls_token=True,
+    num_classes=100,
+    drop_rate=0.0,
+    drop_path_rate=0.1,
+    drop_block_rate=None,
+    img_size=224,
+    use_peft=True,
+    lora_out_proj=True,
+    lora_d=True,
+    lora_B=True,
+    lora_in_proj=True,
+    lora_out_proj_mamba=True,  
+    lora_x_proj=True,
+    additional_scan=True,
+    learnable_D_v2=True,
+    learnable_bias_v2=True,
+    lora_r=16,
+    lora_alpha=32
     )
     return model
 
@@ -70,7 +82,7 @@ def main():
     device = Config.DEVICE
     model = get_model().to(device)
 
-    model_path = Config.TRAIN.model_path()
+    model_path = "./results/forget/task2.pth"
     if not os.path.exists(model_path):
         print(f"❌ Model file not found at: {model_path}")
         return

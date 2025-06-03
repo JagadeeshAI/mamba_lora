@@ -20,14 +20,14 @@ class LoRALinear(nn.Module):
 _original_init = VisionMamba.__init__
 
 
-def _patched_init(self, *args, lora_out_proj=False, lora_r=8, lora_alpha=1.0, **kwargs):
+def _patched_init(self, *args, lora_out_proj=False, lora_r=8, lora_alpha=1.0, use_peft=False, **kwargs):
+    kwargs["use_peft"] = use_peft  # ✅ inject back into original kwargs!
     _original_init(self, *args, **kwargs)
 
     if lora_out_proj:
-        print(
-            f"✅ Injecting LoRA into classifier head with r={lora_r}, alpha={lora_alpha}"
-        )
+        print(f"✅ Injecting LoRA into classifier head with r={lora_r}, alpha={lora_alpha}")
         self.head = LoRALinear(self.head, r=lora_r, alpha=lora_alpha)
+
 
 
 VisionMamba.__init__ = _patched_init

@@ -3,7 +3,7 @@ warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import torch
 
-from src.models.VisionMamba import VisionMamba
+from src.model.arch2 import VisionMamba
 
 def print_lora_stats(model):
     total_params = sum(p.numel() for p in model.parameters())

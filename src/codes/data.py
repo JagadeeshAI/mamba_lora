@@ -14,45 +14,43 @@ logger = logging.getLogger(__name__)
 
 
 class ImageDataset(Dataset):
-    def __init__(self, data_path, transform=None, class_filter=None):
+    def __init__(self, data_path, transform=None, class_filter=None, class_to_idx=None):
         self.data_path = data_path
         self.transform = transform
         self.class_filter = class_filter
         self.samples = []
         self.classes = []
-        self.class_to_idx = {}
+        self.class_to_idx = class_to_idx
         self._load_data()
-    
+
     def _load_data(self):
         if not os.path.exists(self.data_path):
             logger.warning(f"Data path {self.data_path} does not exist")
             return
-        
-        all_class_dirs = [d for d in os.listdir(self.data_path) 
-                          if os.path.isdir(os.path.join(self.data_path, d))]
-        all_class_dirs.sort()
-        
-        if self.class_filter is not None:
-            class_dirs = [d for d in all_class_dirs if d in self.class_filter]
-        else:
-            class_dirs = all_class_dirs
-        
+
+        all_class_dirs = sorted([
+            d for d in os.listdir(self.data_path)
+            if os.path.isdir(os.path.join(self.data_path, d))
+        ])
+
+        if self.class_to_idx is None:
+            self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(all_class_dirs)}
+
+        class_dirs = [cls for cls in self.class_to_idx if (self.class_filter is None or cls in self.class_filter)]
         self.classes = class_dirs
-        self.class_to_idx = {cls_name: idx for idx, cls_name in enumerate(class_dirs)}
-        
+
         for class_name in class_dirs:
             class_path = os.path.join(self.data_path, class_name)
             class_idx = self.class_to_idx[class_name]
             for filename in os.listdir(class_path):
                 if filename.lower().endswith(('.png', '.jpg', '.jpeg', '.bmp', '.tiff')):
-                    img_path = os.path.join(class_path, filename)
-                    self.samples.append((img_path, class_idx))
-        
+                    self.samples.append((os.path.join(class_path, filename), class_idx))
+
         logger.info(f"Loaded {len(self.samples)} samples from {len(self.classes)} classes")
-    
+
     def __len__(self):
         return len(self.samples)
-    
+
     def __getitem__(self, idx):
         img_path, label = self.samples[idx]
         try:
@@ -75,16 +73,16 @@ class ContinualForgettingManager:
         self.seed = seed
         self.all_classes = None
         self.task_splits = None
-        
+
     def set_class_names(self, class_names: List[str]):
         if len(class_names) != self.num_classes:
             logger.warning(f"Expected {self.num_classes} classes, got {len(class_names)}")
             self.num_classes = len(class_names)
             self.num_tasks = self.num_classes // self.classes_per_task
-        
+
         self.all_classes = sorted(class_names)
         self._create_task_splits()
-    
+
     def _create_task_splits(self):
         random.seed(self.seed)
         np.random.seed(self.seed)
@@ -96,7 +94,7 @@ class ContinualForgettingManager:
             end_idx = start_idx + self.classes_per_task
             self.task_splits[task_id] = shuffled_classes[start_idx:end_idx]
         logger.info(f"Created {self.num_tasks} task splits with {self.classes_per_task} classes each")
-    
+
     def get_task_classes(self, task_id: int) -> Dict[str, List[str]]:
         if task_id == 0:
             return {
@@ -117,7 +115,7 @@ class ContinualForgettingManager:
             'current_forgotten': current_forgotten_classes,
             'old_forgotten': old_forgotten_classes
         }
-    
+
     def print_task_summary(self, task_id: int):
         task_classes = self.get_task_classes(task_id)
         print(f"\n{'='*60}")
@@ -132,6 +130,9 @@ class ContinualForgettingManager:
             print(f"❌ Current forgotten: {task_classes['current_forgotten'][:3]}...{task_classes['current_forgotten'][-3:]}")
         if task_classes['old_forgotten']:
             print(f"📋 Old forgotten: {task_classes['old_forgotten'][:3]}...{task_classes['old_forgotten'][-3:]}")
+
+    def get_class_to_idx(self) -> Dict[str, int]:
+        return {cls_name: idx for idx, cls_name in enumerate(self.all_classes)}
 
 
 def get_train_transforms():
@@ -156,66 +157,62 @@ def get_val_transforms():
 def get_full_train_loader():
     transform = get_train_transforms()
     dataset = ImageDataset(Config.FULL_TRAIN_DATA_PATH, transform=transform)
-    return DataLoader(
-        dataset,
-        batch_size=Config.TRAIN.BATCH_SIZE,
-        shuffle=True,
-        num_workers=Config.NUM_WORKERS,
-        pin_memory=Config.PIN_MEMORY,
-        drop_last=True
-    )
+    return DataLoader(dataset, batch_size=Config.TRAIN.BATCH_SIZE, shuffle=True,
+                      num_workers=Config.NUM_WORKERS, pin_memory=Config.PIN_MEMORY, drop_last=True)
 
 
 def get_full_val_loader():
     transform = get_val_transforms()
     dataset = ImageDataset(Config.FULL_VAL_DATA_PATH, transform=transform)
-    return DataLoader(
-        dataset,
-        batch_size=Config.TRAIN.BATCH_SIZE,
-        shuffle=False,
-        num_workers=Config.NUM_WORKERS,
-        pin_memory=Config.PIN_MEMORY
-    )
+    return DataLoader(dataset, batch_size=Config.TRAIN.BATCH_SIZE, shuffle=False,
+                      num_workers=Config.NUM_WORKERS, pin_memory=Config.PIN_MEMORY)
 
 
 def get_task_validation_loaders(task_id: int, forgetting_manager: ContinualForgettingManager) -> Dict[str, DataLoader]:
     transform = get_val_transforms()
     task_classes = forgetting_manager.get_task_classes(task_id)
+    class_to_idx = forgetting_manager.get_class_to_idx()
     loaders = {}
 
-    def loader_for_classes(class_list, name):
+    def loader_for_classes(class_list):
         if not class_list:
             return None
-        dataset = ImageDataset(Config.FULL_VAL_DATA_PATH, transform=transform, class_filter=class_list)
+        dataset = ImageDataset(Config.FULL_VAL_DATA_PATH, transform=transform,
+                               class_filter=class_list, class_to_idx=class_to_idx)
         return DataLoader(dataset, batch_size=Config.TRAIN.BATCH_SIZE, shuffle=False,
                           num_workers=Config.NUM_WORKERS, pin_memory=Config.PIN_MEMORY)
 
-    loaders['retained'] = loader_for_classes(task_classes['retained'], 'retained')
-    loaders['current_forgotten'] = loader_for_classes(task_classes['current_forgotten'], 'current_forgotten')
-    loaders['old_forgotten'] = loader_for_classes(task_classes['old_forgotten'], 'old_forgotten')
+    loaders['retained'] = loader_for_classes(task_classes['retained'])
+    loaders['current_forgotten'] = loader_for_classes(task_classes['current_forgotten'])
+    loaders['old_forgotten'] = loader_for_classes(task_classes['old_forgotten'])
 
     return {k: v for k, v in loaders.items() if v is not None}
 
 
-def get_task_forgetting_loader(task_id: int, forgetting_manager: ContinualForgettingManager) -> DataLoader:
+def get_task_forgetting_loader(task_id: int, forgetting_manager: ContinualForgettingManager) -> Optional[DataLoader]:
     transform = get_train_transforms()
     task_classes = forgetting_manager.get_task_classes(task_id)
-    dataset = ImageDataset(
-        Config.FULL_TRAIN_DATA_PATH,
-        transform=transform,
-        class_filter=task_classes['current_forgotten']
-    )
+    class_to_idx = forgetting_manager.get_class_to_idx()
+    forget_classes = task_classes['current_forgotten']
+
+    if not forget_classes:
+        print(f"ℹ️ Task {task_id}: No classes to forget.")
+        return None
+
+    dataset = ImageDataset(Config.FULL_TRAIN_DATA_PATH, transform=transform,
+                           class_filter=forget_classes, class_to_idx=class_to_idx)
+
     total = len(dataset)
-    indices = np.random.choice(total, int(0.1 * total), replace=False)
+    if total == 0:
+        print(f"⚠️ Task {task_id}: Forget classes found, but no data loaded.")
+        print(f"   🔍 Classes attempted: {forget_classes}")
+        return None
+
+    n_sample = int(Config.FORGET.DATA_RATIO * total)
+    indices = np.random.choice(total, n_sample, replace=False)
     subset = Subset(dataset, indices)
-    return DataLoader(
-        subset,
-        batch_size=Config.TRAIN.BATCH_SIZE,
-        shuffle=True,
-        num_workers=Config.NUM_WORKERS,
-        pin_memory=Config.PIN_MEMORY,
-        drop_last=True
-    )
+    return DataLoader(subset, batch_size=Config.TRAIN.BATCH_SIZE, shuffle=True,
+                      num_workers=Config.NUM_WORKERS, pin_memory=Config.PIN_MEMORY, drop_last=True)
 
 
 def get_continual_forgetting_manager() -> ContinualForgettingManager:

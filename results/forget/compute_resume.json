@@ -1,0 +1,5 @@
+{
+    "task": 4,
+    "epoch": 1,
+    "model_path": "./results/forget/task4.pth"
+}

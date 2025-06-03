@@ -418,26 +418,21 @@ class VisionMamba(nn.Module):
             )
         )
 
-        # ✅ Hybrid PEFT hook (must go after model structure is defined)
-        if kwargs.get("use_peft", False):
+        if kwargs.get("use_peft", True):
             print("🔁 Enabling PEFT hooks...")
+            print("HELOOO")
 
-            # 🔒 Freeze all base layers
+            # Freeze all base model parameters
             for param in self.parameters():
                 param.requires_grad = False
 
-            # 🔁 Apply PEFT hooks dynamically
-            # ❌ Incorrect: These aren't valid args in your version of set_peft
-            # set_peft(self, use_peft=True, rank=96, alpha=0.1)
-
-            # ✅ Corrected: Use correct keys your function accepts
+            # Call dynamic PEFT injection
             set_peft(
                 self,
                 lora_out_proj=kwargs.get("lora_out_proj", True),
                 dim=kwargs.get("dim", 96),
                 s=kwargs.get("s", 0.1),
-                bit=kwargs.get("bit", 32),  # optional or default
-                # Add more flags here if needed, based on config
+                bit=kwargs.get("bit", 32), 
                 lora_in_proj=kwargs.get("lora_in_proj", False),
                 lora_x_proj=kwargs.get("lora_x_proj", False),
                 lora_d=kwargs.get("lora_d", False),
@@ -452,12 +447,13 @@ class VisionMamba(nn.Module):
                 learnable_bias_v2=True,
             )
 
-            # ✅ Verify which LoRA params are trainable
-            for name, param in self.named_parameters():
-                if "lora" in name.lower() and param.requires_grad:
-                    print(
-                        f"✅ LoRA param: {name}, requires_grad: {param.requires_grad}"
-                    )
+            print("🔥 Inside set_peft: Verifying modules...")
+            for name, module in self.named_modules():
+                for param_name, param in module.named_parameters(recurse=False):
+                    if "lora" in param_name.lower():
+                        print(f"   🧩 {name}.{param_name} → requires_grad={param.requires_grad}")
+
+
 
     def allocate_inference_cache(self, batch_size, max_seqlen, dtype=None, **kwargs):
         return {
